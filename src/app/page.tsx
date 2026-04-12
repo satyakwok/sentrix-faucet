@@ -409,6 +409,16 @@ export default function FaucetPage() {
           </a>
           {' '}· For testing only · Not real value
         </p>
+        <p className="text-center text-xs text-[var(--tx-d)] mt-2">
+          <a
+            href="https://t.me/SentrixCommunity"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--gold)]/70 hover:text-[var(--gold)] transition-colors"
+          >
+            Join our Telegram Community →
+          </a>
+        </p>
       </div>
     </div>
   )
