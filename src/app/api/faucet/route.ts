@@ -3,6 +3,8 @@ import { checkRateLimits, recordClaim, getTotalDistributed } from '@/lib/rateLim
 
 const ADDRESS_REGEX = /^0x[0-9a-fA-F]{40}$/
 const RPC_URL = process.env.RPC_URL ?? 'http://103.175.219.233:8545/rpc'
+const SENTRI_PER_SRX = 100_000_000
+const MIN_FEE_SENTRI = 10_000 // protocol minimum enforced by Sentrix node
 
 function getClientIP(request: NextRequest): string {
   const realIP = request.headers.get('x-real-ip')
@@ -78,8 +80,14 @@ export async function POST(request: NextRequest) {
     // Validate server config
     const faucetPrivateKey = process.env.FAUCET_PRIVATE_KEY
     const faucetAddress = process.env.FAUCET_ADDRESS
-    // FAUCET_AMOUNT is in SRX; multiply by 100_000_000 to convert to sentri (chain unit)
-    const amount = parseInt(process.env.FAUCET_AMOUNT ?? '10', 10) * 100_000_000
+    // FAUCET_AMOUNT is in SRX; convert to sentri (chain unit)
+    const amountSRX = parseInt(process.env.FAUCET_AMOUNT ?? '10', 10)
+    const amount = amountSRX * SENTRI_PER_SRX
+    // Fee: enforce protocol minimum regardless of env var
+    const feeSentri = Math.max(
+      parseInt(process.env.FAUCET_FEE_SENTRI ?? '10000', 10),
+      MIN_FEE_SENTRI
+    )
 
     if (!faucetPrivateKey || faucetPrivateKey === 'FILL_IN_FROM_GENESIS_WALLETS') {
       console.error('[faucet] FAUCET_PRIVATE_KEY not configured')
@@ -98,7 +106,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           jsonrpc: '2.0',
           method: 'sentrix_sendTransaction',
-          params: [{ from: faucetAddress, to: address, amount, fee: 10000, private_key: faucetPrivateKey }],
+          params: [{ from: faucetAddress, to: address, amount, fee: feeSentri, private_key: faucetPrivateKey }],
           id: 1,
         }),
         signal: AbortSignal.timeout(15_000),
@@ -137,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     // Record after confirmed success
     recordClaim(ip, address, amount)
-    console.info(`[faucet] Sent ${amount} SRX → ${address} | tx: ${txHash} | ip: ${ip}`)
+    console.info(`[faucet] Sent ${amountSRX} SRX → ${address} | tx: ${txHash} | ip: ${ip}`)
 
     return NextResponse.json({ success: true, txHash })
   } catch (err) {
